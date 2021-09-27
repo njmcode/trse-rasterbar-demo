@@ -1,0 +1,234 @@
+program C64Project;
+@use "screen/screen"
+var
+	// Charsets (http://home-2002.code-cop.org/c64/index.html)
+	const charsetLocation1: address = $2000;
+	charset1: incbin("assets/charset.bin", charsetLocation1);
+
+	const charsetLocation2: address = $2800;
+	charset2: incbin("assets/ancipital.64c", charsetLocation2, 2);
+
+	const charsetLocation3: address = $3000;
+	charset3: incbin("assets/aeg.64c", charsetLocation3, 2);
+
+	// Hollow+ ! (https://csdb.dk/sid/?id=15626)
+	music: incsid("assets/Hollow_plus.sid", 2);
+
+	// Text constants for display
+	S_TITLE_0: string = "- THE -";
+	S_TITLE_1: string = "R A S T E R";
+	S_TITLE_1A: cstring = (82, 32, 65, 32, 83, 32, 84, 32, 69, 32, 82); // Lower half of 1x2 'R A S T E R' text
+	S_TITLE_2: string = "= BAR =";
+	S_BY: string = "--- B Y ---";
+	S_NJMCODE: string = ".:. NJMCODE .:.";
+
+	// Color cycle sequences
+	F_TITLE_1: array[] of byte = (BLUE, PURPLE, LIGHT_BLUE, CYAN, LIGHT_GREEN, WHITE, LIGHT_GREEN, CYAN, LIGHT_BLUE, PURPLE, BLUE, BLACK);
+	F_TITLE_2: array[] of byte = (DARK_GREY, LIGHT_RED);
+	F_NJMCODE: array[] of byte = (RED, LIGHT_RED, YELLOW, WHITE, YELLOW, LIGHT_RED);
+	F_SCROLL_L: cstring = (DARK_GREY, GREY, LIGHT_GREY, LIGHT_GREEN, WHITE);
+	F_SCROLL_R: cstring = (WHITE, LIGHT_GREEN, LIGHT_GREY, GREY, DARK_GREY);
+	F_BORDERS: cstring = (BLUE, LIGHT_BLUE, CYAN, WHITE, CYAN, LIGHT_BLUE);
+
+	// Color cycling + other general vars/pointers
+	const useKernal : byte = 1;
+	const CX: byte = SCREEN_WIDTH / 2;
+	i: byte = 0;
+	f1pos: byte = 0;
+	f1cpos: byte = 0;
+	f2pos: byte = 0;
+	fnpos: byte = 0;
+	fbpos: byte = 0;
+	delay1: byte = 0;
+	p_title_1a: ^byte;
+
+	// Scrolling message vars + data
+	const scroll_cy: byte = 20;
+	const scroll_ry: byte = 179;
+	scrollval: byte = 0;
+	p_scrolltext: ^byte;
+	scrolltext: cstring = ("                                        ",
+                   "HELLO AND WELCOME TO -- THE RASTER BAR -- A C64 NOSTALGIA BLOG BROUGHT TO YOU IN 2021 BY -NJMCODE-  ",
+                   "FROM THE ASHES OF AWESOFT, A NEW FORCE RISES! THIS IS MY FIRST 'DEMO' IN ABOUT 25 YEARS, AND I HAVE SO MUCH TO LEARN! ",
+                   "MUSIC IS THE AMAZING 'HOLLOW+' BY JENS-CHRISTIAN HUUS, WHICH I FIRST HEARD IN 'STUBBY-NOTER' BACK IN THE DAY. SHOUT OUT ",
+                   "TO HAPPI, MY AWESOFT PARTNER-IN-CRIME, TO NINA, AND TO ANYONE READING THIS. CHECK OUT THE BLOG AT THERASTERBAR.COM...",
+                   "                                        ");
+
+// Convenience function for printing the scroll text
+procedure PrintScrollText();
+begin
+	moveto(0, scroll_cy, hi(#screen_char_loc));
+	memcpy(p_scrolltext, 0, screenmemory, screen_width-1);
+end;
+
+// Screen refresh routine, including color cycling
+// and soft-scroll of text message
+// TODO: optimize this shit
+procedure Update();
+begin
+	// RASTER color cycling w/ individual letter offsets
+	if (delay1&2=0) then begin
+		f1cpos := f1pos;
+
+		for i := 0 to 6 do begin
+			moveto(#CX-5 + (i * 2), 8, hi(screen_col_loc));
+			fill(screenmemory, F_TITLE_1[f1cpos], 1);
+			moveto(#CX-5 + (i * 2), 7, hi(screen_col_loc));
+			fill(screenmemory, F_TITLE_1[f1cpos], 1);
+
+			f1cpos := f1cpos + 1;
+			if (f1cpos = 12) then f1cpos := 0;
+		end;
+
+		f1pos := f1pos + 1;
+		if (f1pos = 12) then f1pos := 0;
+	end;
+
+	// BAR color flickering
+	if (delay1&7=0) then begin
+		if (Random() > 128) then begin
+			moveto(#CX-3, 10, hi(screen_col_loc));
+			fill(screenmemory, F_TITLE_2[f2pos], 11);
+			f2pos := f2pos + 1;
+			if (f2pos = 2) then f2pos := 0;
+		end
+	end;
+
+	// NJMCODE color cycling
+	if (delay1&7=0) then begin
+		moveto(#CX-7, 15, hi(screen_col_loc));
+		fill(screenmemory, F_NJMCODE[fnpos], 15);
+		fnpos := fnpos + 1;
+		if (fnpos = 6) then fnpos := 0;
+	end;
+
+	// Border edge color cycling
+	if (delay1&7=0) then begin
+		fbpos := fbpos + 1;
+		if (fbpos = 6) then fbpos := 0;
+	end;
+
+	// Scroll text refresh
+	// (hardware scrolling is done in 'Scroller' interrupt)
+	if (scrollval <= 1) then begin
+		scrollval := 7;
+		p_scrolltext += 1;
+		if (p_scrolltext[39] = 0) then p_scrolltext := #scrolltext;
+		PrintScrollText();
+	end
+	else scrollval := scrollval - 2;
+
+	inc(delay1);
+end;
+
+// Forward-declare our interrupts
+interrupt TextArea();
+interrupt Scroller();
+interrupt Bottom();
+
+// Upper blue border section
+// Also calls the music-play routine
+interrupt Top();
+begin
+	setcharsetlocation(charsetLocation1);
+	startirq(useKernal);
+	call(^$1003);
+	wait(3);
+	SCREEN_BG_COL := BLUE;
+	SCREEN_FG_COL := BLUE;
+	scrollx(0);
+	rasterirq(TextArea(), 50, useKernal);
+	closeirq();
+end;
+
+// Upper flashing border and static text section.
+// Doesn't make any screen updates, just
+// charset changes for the 1x2 'R A S T E R' text
+interrupt TextArea();
+begin
+	startirq(useKernal);
+	wait(1);
+	SCREEN_BG_COL := F_BORDERS[fbpos];
+	SCREEN_FG_COL := F_BORDERS[fbpos];
+	waitforraster(52);
+	wait(11);
+	SCREEN_BG_COL := BLACK;
+	SCREEN_FG_COL := BLACK;
+
+	waitForRaster(100);
+	setcharsetlocation(charsetLocation3);
+	waitForRaster(128);
+	setcharsetlocation(charsetLocation1);
+
+	rasterirq(Scroller(), scroll_ry, useKernal);
+	closeirq();
+end;
+
+// Hardware scrolling + scrolltext charset interrupt.
+interrupt Scroller();
+begin
+	startirq(useKernal);
+	wait(5);
+	setcharsetlocation(charsetLocation2);
+	scrollx(scrollval);
+	rasterirq(Bottom(), 250, useKernal);
+	closeirq();
+end;
+
+// Lower flashing border + blue area.
+// Triggers the color cycling etc as well.
+interrupt Bottom();
+begin
+	startirq(useKernal);
+	scrollx(0);
+	SCREEN_BG_COL := F_BORDERS[fbpos];
+	SCREEN_FG_COL := F_BORDERS[fbpos];
+	wait(2);
+	waitforraster(253);
+	SCREEN_BG_COL := BLUE;
+	SCREEN_FG_COL := BLUE;
+	rasterirq(Top(), 0, useKernal);
+	Update();
+	closeirq();
+end;
+
+// Print all the static screen elements.
+procedure SetupScreen();
+begin
+	definescreen();
+	clearscreen(32, #screen_char_loc);
+	clearscreen(WHITE, #screen_col_loc);
+	SCREEN_BG_COL := BLACK;
+	SCREEN_FG_COL := BLACK;
+	hideborderx(1);
+
+	Screen::PrintStringColor(#S_TITLE_0, #CX-3, 5, LIGHT_BLUE);
+	
+	// 1x2 'R A S T E R' text
+	Screen::PrintStringColor(#S_TITLE_1, #CX-5, 7, WHITE);
+	p_title_1a := #S_TITLE_1A;
+	moveto(#CX-5, 8, hi(#screen_char_loc));
+	memcpy(p_title_1a, 0, screenmemory, 11);
+
+	Screen::PrintStringColor(#S_TITLE_2, #CX-3, 10, LIGHT_RED);
+	Screen::PrintStringColor(#S_BY, #CX-5, 13, GREY);
+	Screen::PrintStringColor(#S_NJMCODE, #CX-7, 15, RED);
+
+	// Color fade at edges of scrolltext
+	moveto(0, scroll_cy, hi(screen_col_loc));
+	memcpy(#F_SCROLL_L, 0, screenmemory, 5);
+	moveto(screen_width - 6, scroll_cy, hi(screen_col_loc));
+	memcpy(#F_SCROLL_R, 0, screenmemory, 5);
+end;
+
+// Main program
+begin
+	SetupScreen();
+	initsid(^$1000);
+	disableciainterrupts();
+	p_scrolltext := #scrolltext;
+
+	startrasterchain(Top(), 0, useKernal);
+
+	loop();
+end.
