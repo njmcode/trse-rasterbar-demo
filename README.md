@@ -19,9 +19,10 @@ Written with [TRSE](https://lemonspawn.com/turbo-rascal-syntax-error-expected-bu
  - [x] Add multi charsets
  - [x] Add 1x2 charset
  - [x] Add raster color cycling
+ - [x] Add bitmap logo
+ - [ ] Fix bitmap color/char memory artifacts
  - [ ] Add swing/tech-tech
  - [ ] Add random character FX
- - [ ] Add bitmap logo
  - [ ] Add multipart scene + space-to-advance
  - [ ] Add scroller FX (sine waves etc)
  - [ ] Add music synchronization FX

@@ -2,10 +2,10 @@ program C64Project;
 @use "screen/screen"
 var
 	// Charsets (http://home-2002.code-cop.org/c64/index.html)
-	const charsetLocation1: address = $2000;
+	const charsetLocation1: address = $2800;
 	charset1: incbin("assets/charset.bin", charsetLocation1);
 
-	const charsetLocation2: address = $2800;
+	const charsetLocation2: address = $3800;
 	charset2: incbin("assets/ancipital.64c", charsetLocation2, 2);
 
 	const charsetLocation3: address = $3000;
@@ -13,6 +13,11 @@ var
 
 	// Hollow+ ! (https://csdb.dk/sid/?id=15626)
 	music: incsid("assets/Hollow_plus.sid", 2);
+	
+	// Logo bitmap data + VIC config holder
+	img_color: incbin("assets/logo_3_color.bin", $5000);
+	img_data: incbin("assets/logo_3_data.bin", $6000);
+	orig: byte = 0;
 
 	// Text constants for display
 	S_TITLE_0: string = "- THE -";
@@ -41,10 +46,12 @@ var
 	fbpos: byte = 0;
 	delay1: byte = 0;
 	p_title_1a: ^byte;
+	scene: byte = 0;
+	sceneTime: byte = 0;
 
 	// Scrolling message vars + data
 	const scroll_cy: byte = 20;
-	const scroll_ry: byte = 179;
+	const scroll_ry: byte = 200;
 	scrollval: byte = 0;
 	p_scrolltext: ^byte;
 	scrolltext: cstring = ("                                        ",
@@ -61,45 +68,98 @@ begin
 	memcpy(p_scrolltext, 0, screenmemory, screen_width-1);
 end;
 
+// Scrolltext color + fades
+procedure SetupScrollColors();
+begin
+	moveto(0, scroll_cy, hi(screen_col_loc));
+	fill(screenmemory, WHITE, screen_width);
+	moveto(0, scroll_cy, hi(screen_col_loc));
+	memcpyfast(#F_SCROLL_L, 0, screenmemory, 5);
+	moveto(screen_width - 6, scroll_cy, hi(screen_col_loc));
+	memcpyfast(#F_SCROLL_R, 0, screenmemory, 5);
+end;
+
+// Set up the static screen elements.
+procedure PrintStatics();
+begin
+	Screen::PrintStringColor(#S_TITLE_0, #CX-3, 5, LIGHT_BLUE);
+	
+	// 1x2 'R A S T E R' text
+	Screen::PrintStringColor(#S_TITLE_1, #CX-5, 7, WHITE);
+	p_title_1a := #S_TITLE_1A;
+	moveto(#CX-5, 8, hi(#screen_char_loc));
+	memcpy(p_title_1a, 0, screenmemory, 11);
+
+	Screen::PrintStringColor(#S_TITLE_2, #CX-3, 10, LIGHT_RED);
+	Screen::PrintStringColor(#S_BY, #CX-5, 13, GREY);
+	Screen::PrintStringColor(#S_NJMCODE, #CX-7, 15, RED);
+end;
+
+// Set up the bitmap data used by the logo.
+procedure SetupBitmap();
+begin
+	copyimagecolordata(#img_color, 1);
+	SetupScrollColors();
+end;
+
 // Screen refresh routine, including color cycling
 // and soft-scroll of text message
 // TODO: optimize this shit
 procedure Update();
 begin
-	// RASTER color cycling w/ individual letter offsets
-	if (delay1&2=0) then begin
-		f1cpos := f1pos;
+	if (sceneTime = 255) then begin
+		if (scene = 0) then scene := 1 else scene := 0;
 
-		for i := 0 to 6 do begin
-			moveto(#CX-5 + (i * 2), 8, hi(screen_col_loc));
-			fill(screenmemory, F_TITLE_1[f1cpos], 1);
-			moveto(#CX-5 + (i * 2), 7, hi(screen_col_loc));
-			fill(screenmemory, F_TITLE_1[f1cpos], 1);
-
-			f1cpos := f1cpos + 1;
-			if (f1cpos = 12) then f1cpos := 0;
-		end;
-
-		f1pos := f1pos + 1;
-		if (f1pos = 12) then f1pos := 0;
-	end;
-
-	// BAR color flickering
-	if (delay1&7=0) then begin
-		if (Random() > 128) then begin
+		if (scene = 1) then begin
 			moveto(#CX-3, 10, hi(screen_col_loc));
-			fill(screenmemory, F_TITLE_2[f2pos], 11);
-			f2pos := f2pos + 1;
-			if (f2pos = 2) then f2pos := 0;
-		end
+			fill(screenmemory, BLUE, 7);
+			// TODO: set bitmap char mem
+		end;
+		sceneTime := 0;
 	end;
 
-	// NJMCODE color cycling
-	if (delay1&7=0) then begin
-		moveto(#CX-7, 15, hi(screen_col_loc));
-		fill(screenmemory, F_NJMCODE[fnpos], 15);
-		fnpos := fnpos + 1;
-		if (fnpos = 6) then fnpos := 0;
+	// Scene 0 - color cycling text
+	if (scene = 0) then begin
+		// RASTER color cycling w/ individual letter offsets
+		if (delay1&2=0) then begin
+			f1cpos := f1pos;
+	
+			for i := 0 to 6 do begin
+				moveto(#CX-5 + (i * 2), 8, hi(screen_col_loc));
+				fill(screenmemory, F_TITLE_1[f1cpos], 1);
+				moveto(#CX-5 + (i * 2), 7, hi(screen_col_loc));
+				fill(screenmemory, F_TITLE_1[f1cpos], 1);
+	
+				f1cpos := f1cpos + 1;
+				if (f1cpos = 12) then f1cpos := 0;
+			end;
+	
+			f1pos := f1pos + 1;
+			if (f1pos = 12) then f1pos := 0;
+		end;
+	
+		// BAR color flickering
+		if (delay1&7=0) then begin
+			if (Random() > 128) then begin
+				moveto(#CX-3, 10, hi(screen_col_loc));
+				fill(screenmemory, F_TITLE_2[f2pos], 7);
+				f2pos := f2pos + 1;
+				if (f2pos = 2) then f2pos := 0;
+			end
+		end;
+	
+		// NJMCODE color cycling
+		if (delay1&7=0) then begin
+			moveto(#CX-7, 15, hi(screen_col_loc));
+			fill(screenmemory, F_NJMCODE[fnpos], 15);
+			fnpos := fnpos + 1;
+			if (fnpos = 6) then fnpos := 0;
+		end;
+	end;
+	
+	// Scene 1 - bitmap logo
+	if (scene = 1) then begin
+		
 	end;
 
 	// Border edge color cycling
@@ -119,10 +179,11 @@ begin
 	else scrollval := scrollval - 2;
 
 	inc(delay1);
+	inc(sceneTime);
 end;
 
 // Forward-declare our interrupts
-interrupt TextArea();
+interrupt MainArea();
 interrupt Scroller();
 interrupt Bottom();
 
@@ -132,19 +193,22 @@ interrupt Top();
 begin
 	setcharsetlocation(charsetLocation1);
 	startirq(useKernal);
+	
 	call(^$1003);
 	wait(3);
+
 	SCREEN_BG_COL := BLUE;
 	SCREEN_FG_COL := BLUE;
 	scrollx(0);
-	rasterirq(TextArea(), 50, useKernal);
+	
+	rasterirq(MainArea(), 50, useKernal);
 	closeirq();
 end;
 
 // Upper flashing border and static text section.
 // Doesn't make any screen updates, just
 // charset changes for the 1x2 'R A S T E R' text
-interrupt TextArea();
+interrupt MainArea();
 begin
 	startirq(useKernal);
 	wait(1);
@@ -155,10 +219,25 @@ begin
 	SCREEN_BG_COL := BLACK;
 	SCREEN_FG_COL := BLACK;
 
-	waitForRaster(100);
-	setcharsetlocation(charsetLocation3);
-	waitForRaster(128);
-	setcharsetlocation(charsetLocation1);
+	if (scene = 0) then begin
+		vic_data_loc := orig;
+		SetBank(vic_bank0);
+		setregularcolormode();
+		settextmode();
+
+		waitForRaster(100);
+		setcharsetlocation(charsetLocation3);
+		waitForRaster(128);
+		setcharsetlocation(charsetLocation1);
+	end;
+	
+	if (scene = 1) then begin
+		wait(5);
+		setmulticolormode();
+		setbitmapmode();
+		vic_data_loc := $18;
+		setbank(vic_bank1);
+	end;
 
 	rasterirq(Scroller(), scroll_ry, useKernal);
 	closeirq();
@@ -169,6 +248,13 @@ interrupt Scroller();
 begin
 	startirq(useKernal);
 	wait(5);
+	if (scene = 1) then begin
+		wait(5);
+		vic_data_loc := orig;
+		SetBank(vic_bank0);
+		setregularcolormode();
+		settextmode();
+	end;
 	setcharsetlocation(charsetLocation2);
 	scrollx(scrollval);
 	rasterirq(Bottom(), 250, useKernal);
@@ -202,23 +288,10 @@ begin
 	SCREEN_FG_COL := BLACK;
 	hideborderx(1);
 
-	Screen::PrintStringColor(#S_TITLE_0, #CX-3, 5, LIGHT_BLUE);
-	
-	// 1x2 'R A S T E R' text
-	Screen::PrintStringColor(#S_TITLE_1, #CX-5, 7, WHITE);
-	p_title_1a := #S_TITLE_1A;
-	moveto(#CX-5, 8, hi(#screen_char_loc));
-	memcpy(p_title_1a, 0, screenmemory, 11);
-
-	Screen::PrintStringColor(#S_TITLE_2, #CX-3, 10, LIGHT_RED);
-	Screen::PrintStringColor(#S_BY, #CX-5, 13, GREY);
-	Screen::PrintStringColor(#S_NJMCODE, #CX-7, 15, RED);
-
-	// Color fade at edges of scrolltext
-	moveto(0, scroll_cy, hi(screen_col_loc));
-	memcpy(#F_SCROLL_L, 0, screenmemory, 5);
-	moveto(screen_width - 6, scroll_cy, hi(screen_col_loc));
-	memcpy(#F_SCROLL_R, 0, screenmemory, 5);
+	orig := vic_data_loc;
+	SetupBitmap();
+	PrintStatics();
+	SetupScrollColors();
 end;
 
 // Main program
@@ -226,6 +299,7 @@ begin
 	SetupScreen();
 	initsid(^$1000);
 	disableciainterrupts();
+	setmemoryconfig(1, useKernal, 0);
 	p_scrolltext := #scrolltext;
 
 	startrasterchain(Top(), 0, useKernal);

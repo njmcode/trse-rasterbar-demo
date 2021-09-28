@@ -1,0 +1,91 @@
+program LogoTest;
+@use "screen/screen"
+var
+	img_color: incbin("assets/logo_3_color.bin", $5000);
+	img_data: incbin("assets/logo_3_data.bin", $6000);
+	orig: byte = 0;
+
+interrupt Top();
+interrupt Middle();
+interrupt Bottom();
+
+interrupt Top();
+begin
+	startirq(1);
+	vic_data_loc := orig;
+	SetBank(vic_bank0);
+	setregularcolormode();
+	settextmode();
+
+	screen_fg_col := BLUE;
+	screen_bg_col := BLUE;
+
+	rasterirq(Middle(), 103, 1);
+	closeirq(); 
+end;
+
+interrupt Middle();
+begin
+	startirq(1);
+	
+	wait(14);
+
+	screen_fg_col := BLACK;
+	screen_bg_col := BLACK;
+
+	setmulticolormode();
+	setbitmapmode();
+	vic_data_loc := $18;
+	setbank(vic_bank1);
+	
+	rasterirq(Bottom(), 194, 1);
+	closeirq();
+end;
+
+interrupt Bottom();
+begin
+	startirq(1);
+	
+	wait(2);
+
+	screen_fg_col := BLUE;
+	screen_bg_col := BLUE;
+
+	vic_data_loc := orig;
+	SetBank(vic_bank0);
+	setregularcolormode();
+	settextmode();
+
+	
+
+	rasterirq(Top(), 0, 1);
+	closeirq(); 
+end;
+
+procedure SetupScreen();
+begin
+	screen_fg_col := BLACK;
+	screen_bg_col := BLACK;
+	clearscreen(32, #screen_char_loc);
+	clearscreen(BLUE, #screen_col_loc);
+
+	copyimagecolordata(#img_color, 1);
+
+	Screen::PrintStringColor("THIS IS A TEST", 5, 5, LIGHT_RED);
+	Screen::PrintStringColor("HOPE IT WORKS", 10, 20, LIGHT_GREEN);
+	
+	moveto(0, 18, hi(screen_col_loc));
+	fill(screenmemory, BLUE, screen_width);
+end;
+
+begin
+	disableciainterrupts();
+	SetupScreen();
+	orig := vic_data_loc;
+
+	
+	
+	startrasterchain(Top(), 0, 1);
+	
+	loop();
+end.
