@@ -24,7 +24,7 @@ var
 	S_TITLE_1: string = "R A S T E R";
 	S_TITLE_1A: cstring = (82, 32, 65, 32, 83, 32, 84, 32, 69, 32, 82); // Lower half of 1x2 'R A S T E R' text
 	S_TITLE_2: string = "= BAR =";
-	S_BY: string = "--- B Y ---";
+	S_BY: string = "- B Y -";
 	S_NJMCODE: string = ".:. NJMCODE .:.";
 
 	// Color cycle sequences
@@ -47,7 +47,7 @@ var
 	delay1: byte = 0;
 	p_title_1a: ^byte;
 	scene: byte = 0;
-	sceneTime: byte = 0;
+	sceneTime: byte = 255;
 
 	// Scrolling message vars + data
 	const scroll_cy: byte = 20;
@@ -91,7 +91,7 @@ begin
 	memcpy(p_title_1a, 0, screenmemory, 11);
 
 	Screen::PrintStringColor(#S_TITLE_2, #CX-3, 10, LIGHT_RED);
-	Screen::PrintStringColor(#S_BY, #CX-5, 13, GREY);
+	Screen::PrintStringColor(#S_BY, #CX-3, 13, GREY);
 	Screen::PrintStringColor(#S_NJMCODE, #CX-7, 15, RED);
 end;
 
@@ -102,20 +102,48 @@ begin
 	SetupScrollColors();
 end;
 
+// Plug color memory holes
+// after switching from bitmap mode
+procedure RefreshText();
+begin
+	moveto(#CX-3, 10, hi(screen_col_loc));
+	fill(screenmemory, LIGHT_RED, 7);
+	moveto(#CX-3, 13, hi(screen_col_loc));
+	fill(screenmemory, GREY, 7);
+end;
+
+// Plug color memory holes
+// after mode switching from text mode
+procedure RefreshBitmap();
+begin
+	moveto(#CX-3, 10, hi(screen_col_loc));
+	fill(screenmemory, BLUE, 7);
+	moveto(#CX-3, 13, hi(screen_col_loc));
+	screenmemory[0] := RED;
+	screenmemory[1] := BLUE;
+	screenmemory[4] := BLUE;
+	screenmemory[5] := BLUE;
+	screenmemory[6] := RED;
+	moveto(#CX-7, 15, hi(screen_col_loc));
+	fill(screenmemory, PURPLE, 15);
+end;
+
 // Screen refresh routine, including color cycling
 // and soft-scroll of text message
 // TODO: optimize this shit
 procedure Update();
 begin
-	if (sceneTime = 255) then begin
+	if (sceneTime = 0) then begin
 		if (scene = 0) then scene := 1 else scene := 0;
+		
+		if (scene = 0) then begin
+			RefreshText();
+		end;
 
 		if (scene = 1) then begin
-			moveto(#CX-3, 10, hi(screen_col_loc));
-			fill(screenmemory, BLUE, 7);
-			// TODO: set bitmap char mem
+			RefreshBitmap();
 		end;
-		sceneTime := 0;
+		sceneTime := 255;
 	end;
 
 	// Scene 0 - color cycling text
@@ -179,7 +207,7 @@ begin
 	else scrollval := scrollval - 2;
 
 	inc(delay1);
-	inc(sceneTime);
+	dec(sceneTime);
 end;
 
 // Forward-declare our interrupts
@@ -195,7 +223,7 @@ begin
 	startirq(useKernal);
 	
 	call(^$1003);
-	wait(3);
+	wait(1);
 
 	SCREEN_BG_COL := BLUE;
 	SCREEN_FG_COL := BLUE;
@@ -232,7 +260,7 @@ begin
 	end;
 	
 	if (scene = 1) then begin
-		wait(5);
+		wait(4);
 		setmulticolormode();
 		setbitmapmode();
 		vic_data_loc := $18;
