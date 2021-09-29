@@ -82,8 +82,6 @@ begin
 	disableciainterrupts();
 	SetupScreen();
 	orig := vic_data_loc;
-
-	
 	
 	startrasterchain(Top(), 0, 1);
 	

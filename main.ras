@@ -18,6 +18,14 @@ var
 	img_color: incbin("assets/logo_4_color.bin", $5000);
 	img_data: incbin("assets/logo_4_data.bin", $6000);
 	orig: byte = 0;
+	
+	// njmcode logo sprites
+	@define spriteLocation $4000
+	@define spritex 31
+	@define spritey 52
+	@define spritex2 245
+	@define spritey2 229
+	njmsprites: incbin("assets/logosprites.bin", @spriteLocation); 
 
 	// Text constants for display
 	S_TITLE_0: string = "- THE -";
@@ -50,7 +58,7 @@ var
 	sceneTime: byte = 255;
 
 	// Scrolling message vars + data
-	const scroll_cy: byte = 20;
+	const scroll_cy: byte = 19;
 	const scroll_ry: byte = 200;
 	scrollval: byte = 0;
 	p_scrolltext: ^byte;
@@ -82,17 +90,17 @@ end;
 // Set up the static screen elements.
 procedure PrintStatics();
 begin
-	Screen::PrintStringColor(#S_TITLE_0, #CX-3, 5, LIGHT_BLUE);
+	Screen::PrintStringColor(#S_TITLE_0, #CX-3, 6, LIGHT_BLUE);
 	
 	// 1x2 'R A S T E R' text
-	Screen::PrintStringColor(#S_TITLE_1, #CX-5, 7, WHITE);
+	Screen::PrintStringColor(#S_TITLE_1, #CX-5, 8, WHITE);
 	p_title_1a := #S_TITLE_1A;
-	moveto(#CX-5, 8, hi(#screen_char_loc));
+	moveto(#CX-5, 9, hi(#screen_char_loc));
 	memcpy(p_title_1a, 0, screenmemory, 11);
 
-	Screen::PrintStringColor(#S_TITLE_2, #CX-3, 10, LIGHT_RED);
-	Screen::PrintStringColor(#S_BY, #CX-3, 13, GREY);
-	Screen::PrintStringColor(#S_NJMCODE, #CX-7, 15, RED);
+	Screen::PrintStringColor(#S_TITLE_2, #CX-3, 11, LIGHT_RED);
+	Screen::PrintStringColor(#S_BY, #CX-3, 14, GREY);
+	Screen::PrintStringColor(#S_NJMCODE, #CX-7, 16, RED);
 end;
 
 // Set up the bitmap data used by the logo.
@@ -106,9 +114,9 @@ end;
 // after switching from bitmap mode
 procedure RefreshText();
 begin
-	moveto(#CX-3, 10, hi(screen_col_loc));
+	moveto(#CX-3, 11, hi(screen_col_loc));
 	fillfast(screenmemory, LIGHT_RED, 7);
-	moveto(#CX-3, 13, hi(screen_col_loc));
+	moveto(#CX-3, 14, hi(screen_col_loc));
 	fillfast(screenmemory, GREY, 7);
 end;
 
@@ -116,17 +124,33 @@ end;
 // after mode switching from text mode
 procedure RefreshBitmap();
 begin
-	moveto(#CX-3, 10, hi(screen_col_loc));
+	moveto(#CX-3, 11, hi(screen_col_loc));
 	fillfast(screenmemory, BLUE, 7);
-	moveto(#CX-3, 13, hi(screen_col_loc));
+	moveto(#CX-3, 14, hi(screen_col_loc));
 	screenmemory[0] := RED;
 	screenmemory[1] := BLUE;
 	screenmemory[4] := BLUE;
 	screenmemory[5] := BLUE;
 	screenmemory[6] := RED;
 	screenmemory[7] := RED;
-	moveto(#CX-7, 15, hi(screen_col_loc));
+	moveto(#CX-7, 16, hi(screen_col_loc));
 	fillfast(screenmemory, PURPLE, 15);
+end;
+
+procedure SpritesTop();
+begin
+	spritepos(@spritex, @spritey, 0);
+	spritepos(@spritex + 24, @spritey, 1);
+	spritepos(@spritex + 48, @spritey, 2);
+	spritepos(@spritex + 72, @spritey, 3);
+end;
+
+procedure SpritesBottom();
+begin
+	spritepos(@spritex2, @spritey2, 0);
+	spritepos(@spritex2 + 24, @spritey2, 1);
+	spritepos(@spritex2 + 48, @spritey2, 2);
+	spritepos(@spritex2 + 72, @spritey2, 3);
 end;
 
 // Screen refresh routine, including color cycling
@@ -156,7 +180,7 @@ begin
 			for i := 0 to 6 do begin
 				moveto(#CX-5 + (i * 2), 8, hi(screen_col_loc));
 				fill(screenmemory, F_TITLE_1[f1cpos], 1);
-				moveto(#CX-5 + (i * 2), 7, hi(screen_col_loc));
+				moveto(#CX-5 + (i * 2), 9, hi(screen_col_loc));
 				fill(screenmemory, F_TITLE_1[f1cpos], 1);
 	
 				f1cpos := f1cpos + 1;
@@ -170,7 +194,7 @@ begin
 		// BAR color flickering
 		if (delay1&7=0) then begin
 			if (Random() > 128) then begin
-				moveto(#CX-3, 10, hi(screen_col_loc));
+				moveto(#CX-3, 11, hi(screen_col_loc));
 				fill(screenmemory, F_TITLE_2[f2pos], 7);
 				f2pos := f2pos + 1;
 				if (f2pos = 2) then f2pos := 0;
@@ -179,7 +203,7 @@ begin
 	
 		// NJMCODE color cycling
 		if (delay1&7=0) then begin
-			moveto(#CX-7, 15, hi(screen_col_loc));
+			moveto(#CX-7, 16, hi(screen_col_loc));
 			fill(screenmemory, F_NJMCODE[fnpos], 15);
 			fnpos := fnpos + 1;
 			if (fnpos = 6) then fnpos := 0;
@@ -228,9 +252,11 @@ begin
 
 	SCREEN_BG_COL := BLUE;
 	SCREEN_FG_COL := BLUE;
+	SetBank(vic_bank1);
 	scrollx(0);
+	SpritesTop();
 	
-	rasterirq(MainArea(), 50, useKernal);
+	rasterirq(MainArea(), 78, useKernal);
 	closeirq();
 end;
 
@@ -243,7 +269,7 @@ begin
 	wait(1);
 	SCREEN_BG_COL := F_BORDERS[fbpos];
 	SCREEN_FG_COL := F_BORDERS[fbpos];
-	waitforraster(52);
+	waitnoraster(2);
 	wait(11);
 	SCREEN_BG_COL := BLACK;
 	SCREEN_FG_COL := BLACK;
@@ -253,10 +279,9 @@ begin
 		SetBank(vic_bank0);
 		setregularcolormode();
 		settextmode();
-
-		waitForRaster(100);
+		waitForRaster(108);
 		setcharsetlocation(charsetLocation3);
-		waitForRaster(128);
+		waitForRaster(136);
 		setcharsetlocation(charsetLocation1);
 	end;
 	
@@ -267,6 +292,8 @@ begin
 		vic_data_loc := $18;
 		setbank(vic_bank1);
 	end;
+
+	SpritesBottom();
 
 	rasterirq(Scroller(), scroll_ry, useKernal);
 	closeirq();
@@ -286,7 +313,7 @@ begin
 	end;
 	setcharsetlocation(charsetLocation2);
 	scrollx(scrollval);
-	rasterirq(Bottom(), 250, useKernal);
+	rasterirq(Bottom(), 220, useKernal);
 	closeirq();
 end;
 
@@ -296,12 +323,14 @@ interrupt Bottom();
 begin
 	startirq(useKernal);
 	scrollx(0);
+	wait(11);
 	SCREEN_BG_COL := F_BORDERS[fbpos];
 	SCREEN_FG_COL := F_BORDERS[fbpos];
-	wait(2);
-	waitforraster(253);
+	waitnoraster(1);
+	wait(10);
 	SCREEN_BG_COL := BLUE;
 	SCREEN_FG_COL := BLUE;
+	SetBank(vic_bank1);
 	rasterirq(Top(), 0, useKernal);
 	Update();
 	closeirq();
@@ -323,9 +352,34 @@ begin
 	SetupScrollColors();
 end;
 
+// Set up the 'njmcode' logo sprites.
+procedure InitSprites();
+begin
+	sprite_multicolor := $ff;
+	sprite_multicolor_reg1 := BLACK;
+	sprite_multicolor_reg2 := CYAN;
+
+	sprite_color[0] := LIGHT_BLUE;
+	setspriteloc(0, @spriteLocation/64, 1);
+	togglebit(sprite_bitmask, 0, 1);
+
+	sprite_color[1] := LIGHT_BLUE;
+	setspriteloc(1, @spriteLocation/64 + 1, 1);
+	togglebit(sprite_bitmask, 1, 1);
+	
+	sprite_color[2] := LIGHT_BLUE;
+	setspriteloc(2, @spriteLocation/64 + 2, 1);
+	togglebit(sprite_bitmask, 2, 1);
+
+	sprite_color[3] := LIGHT_BLUE;
+	setspriteloc(3, @spriteLocation/64 + 3, 1);
+	togglebit(sprite_bitmask, 3, 1);
+end;
+
 // Main program
 begin
 	SetupScreen();
+	InitSprites();
 	initsid(^$1000);
 	disableciainterrupts();
 	setmemoryconfig(1, useKernal, 0);
