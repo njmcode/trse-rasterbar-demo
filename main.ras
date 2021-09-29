@@ -15,8 +15,8 @@ var
 	music: incsid("assets/Hollow_plus.sid", 2);
 	
 	// Logo bitmap data + VIC config holder
-	img_color: incbin("assets/logo_3_color.bin", $5000);
-	img_data: incbin("assets/logo_3_data.bin", $6000);
+	img_color: incbin("assets/logo_4_color.bin", $5000);
+	img_data: incbin("assets/logo_4_data.bin", $6000);
 	orig: byte = 0;
 
 	// Text constants for display
@@ -107,9 +107,9 @@ end;
 procedure RefreshText();
 begin
 	moveto(#CX-3, 10, hi(screen_col_loc));
-	fill(screenmemory, LIGHT_RED, 7);
+	fillfast(screenmemory, LIGHT_RED, 7);
 	moveto(#CX-3, 13, hi(screen_col_loc));
-	fill(screenmemory, GREY, 7);
+	fillfast(screenmemory, GREY, 7);
 end;
 
 // Plug color memory holes
@@ -117,15 +117,16 @@ end;
 procedure RefreshBitmap();
 begin
 	moveto(#CX-3, 10, hi(screen_col_loc));
-	fill(screenmemory, BLUE, 7);
+	fillfast(screenmemory, BLUE, 7);
 	moveto(#CX-3, 13, hi(screen_col_loc));
 	screenmemory[0] := RED;
 	screenmemory[1] := BLUE;
 	screenmemory[4] := BLUE;
 	screenmemory[5] := BLUE;
 	screenmemory[6] := RED;
+	screenmemory[7] := RED;
 	moveto(#CX-7, 15, hi(screen_col_loc));
-	fill(screenmemory, PURPLE, 15);
+	fillfast(screenmemory, PURPLE, 15);
 end;
 
 // Screen refresh routine, including color cycling
