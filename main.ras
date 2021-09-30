@@ -21,18 +21,24 @@ var
 	
 	// njmcode logo sprites
 	@define spriteLocation $4000
-	@define spritex 31
+	@define spritex 78 // 31
 	@define spritey 52
-	@define spritex2 245
+	@define spritex2 204 // 245
 	@define spritey2 229
 	njmsprites: incbin("assets/logosprites.bin", @spriteLocation); 
+	sprite_hi_x: integer = @spritex;
+	sprite_lo_x: integer = @spritex2;
+	
+	// Sine data calculation
+	sine_table: array[256] of byte;
+	sine_idx: byte = 0;
 
 	// Text constants for display
 	S_TITLE_0: string = "- THE -";
 	S_TITLE_1: string = "R A S T E R";
 	S_TITLE_1A: cstring = (82, 32, 65, 32, 83, 32, 84, 32, 69, 32, 82); // Lower half of 1x2 'R A S T E R' text
 	S_TITLE_2: string = "= BAR =";
-	S_BY: string = "- B Y -";
+	S_BY: string = "B Y";
 	S_NJMCODE: string = ".:. NJMCODE .:.";
 
 	// Color cycle sequences
@@ -99,7 +105,7 @@ begin
 	memcpy(p_title_1a, 0, screenmemory, 11);
 
 	Screen::PrintStringColor(#S_TITLE_2, #CX-3, 11, LIGHT_RED);
-	Screen::PrintStringColor(#S_BY, #CX-3, 14, GREY);
+	Screen::PrintStringColor(#S_BY, #CX-1, 14, GREY);
 	Screen::PrintStringColor(#S_NJMCODE, #CX-7, 16, RED);
 end;
 
@@ -116,8 +122,8 @@ procedure RefreshText();
 begin
 	moveto(#CX-3, 11, hi(screen_col_loc));
 	fillfast(screenmemory, LIGHT_RED, 7);
-	moveto(#CX-3, 14, hi(screen_col_loc));
-	fillfast(screenmemory, GREY, 7);
+	moveto(#CX-1, 14, hi(screen_col_loc));
+	fillfast(screenmemory, GREY, 3);
 end;
 
 // Plug color memory holes
@@ -126,31 +132,30 @@ procedure RefreshBitmap();
 begin
 	moveto(#CX-3, 11, hi(screen_col_loc));
 	fillfast(screenmemory, BLUE, 7);
-	moveto(#CX-3, 14, hi(screen_col_loc));
+	moveto(#CX-1, 14, hi(screen_col_loc));
 	screenmemory[0] := RED;
 	screenmemory[1] := BLUE;
-	screenmemory[4] := BLUE;
-	screenmemory[5] := BLUE;
-	screenmemory[6] := RED;
-	screenmemory[7] := RED;
+	screenmemory[2] := RED;
 	moveto(#CX-7, 16, hi(screen_col_loc));
 	fillfast(screenmemory, PURPLE, 15);
 end;
 
 procedure SpritesTop();
 begin
-	spritepos(@spritex, @spritey, 0);
-	spritepos(@spritex + 24, @spritey, 1);
-	spritepos(@spritex + 48, @spritey, 2);
-	spritepos(@spritex + 72, @spritey, 3);
+	sprite_hi_x := @spritex + sine_table[sine_idx];
+	spritepos(sprite_hi_x, @spritey, 0);
+	spritepos(sprite_hi_x + 24, @spritey, 1);
+	spritepos(sprite_hi_x + 48, @spritey, 2);
+	spritepos(sprite_hi_x + 72, @spritey, 3);
 end;
 
 procedure SpritesBottom();
 begin
-	spritepos(@spritex2, @spritey2, 0);
-	spritepos(@spritex2 + 24, @spritey2, 1);
-	spritepos(@spritex2 + 48, @spritey2, 2);
-	spritepos(@spritex2 + 72, @spritey2, 3);
+	sprite_lo_x := @spritex2 - sine_table[sine_idx];
+	spritepos(sprite_lo_x, @spritey2, 0);
+	spritepos(sprite_lo_x + 24 , @spritey2, 1);
+	spritepos(sprite_lo_x + 48 , @spritey2, 2);
+	spritepos(sprite_lo_x + 72 , @spritey2, 3);
 end;
 
 // Screen refresh routine, including color cycling
@@ -230,6 +235,9 @@ begin
 		PrintScrollText();
 	end
 	else scrollval := scrollval - 2;
+	
+	// Sprite movement
+	sine_idx += 2; 
 
 	inc(delay1);
 	dec(sceneTime);
@@ -269,7 +277,7 @@ begin
 	wait(1);
 	SCREEN_BG_COL := F_BORDERS[fbpos];
 	SCREEN_FG_COL := F_BORDERS[fbpos];
-	waitnoraster(2);
+	waitnoraster(1);
 	wait(11);
 	SCREEN_BG_COL := BLACK;
 	SCREEN_FG_COL := BLACK;
@@ -378,6 +386,11 @@ end;
 
 // Main program
 begin
+	// Sine calc
+	for i:=0 to 256 do begin
+		sine_table[i] := sine[i] / 2;	
+	end;
+	
 	SetupScreen();
 	InitSprites();
 	initsid(^$1000);

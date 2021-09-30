@@ -22,7 +22,7 @@ Written with [TRSE](https://lemonspawn.com/turbo-rascal-syntax-error-expected-bu
  - [x] Add bitmap logo
  - [x] Fix bitmap color/char memory artifacts
  - [x] Add sprite logos
- - [ ] Add sine motion to logos
+ - [x] Add sine motion to logos
  - [ ] Display sprites in border
  - [ ] Add swing/tech-tech
  - [ ] Add random character FX
